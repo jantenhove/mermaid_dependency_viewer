@@ -77,13 +77,6 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code, searchTerm }) =>
     };
   }, [code]);
 
-  // When searching, clear selection
-  useEffect(() => {
-    if (searchTerm) {
-      setSelectedNode(null);
-    }
-  }, [searchTerm]);
-
   // Apply Styles based on Selection OR Search
   useEffect(() => {
     if (!containerRef.current) return;
@@ -130,7 +123,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code, searchTerm }) =>
     setOpacity(allNodes, '1');
     setOpacity(allEdges, '1');
 
-    // Search logic takes precedence
+    // Apply search filter first
     if (searchTerm) {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         const matchedNodeIds = new Set<string>();
@@ -142,41 +135,46 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code, searchTerm }) =>
             }
         });
 
-        // Dim everything first
+        // Dim everything that doesn't match
         setOpacity(allNodes, '0.1');
         setOpacity(allEdges, '0.05');
 
-        if (matchedNodeIds.size === 0) return; // Nothing to highlight
+        if (matchedNodeIds.size > 0) {
+            const nodesToHighlight = new Set<string>(matchedNodeIds);
+            matchedNodeIds.forEach(id => {
+                const connections = graphData.adjacency.get(id);
+                connections?.incoming.forEach(inc => nodesToHighlight.add(inc));
+                connections?.outgoing.forEach(out => nodesToHighlight.add(out));
+            });
 
-        const nodesToHighlight = new Set<string>(matchedNodeIds);
-        matchedNodeIds.forEach(id => {
-            const connections = graphData.adjacency.get(id);
-            connections?.incoming.forEach(inc => nodesToHighlight.add(inc));
-            connections?.outgoing.forEach(out => nodesToHighlight.add(out));
-        });
-
-        allNodes.forEach((node: Element) => {
-            const nodeId = findNodeIdFromSvgId(node.id, graphData.nodes);
-            if (nodeId && nodesToHighlight.has(nodeId)) {
-                (node as SVGElement).style.opacity = '1';
-                if (matchedNodeIds.has(nodeId)) {
-                    node.classList.add('node-search-match');
+            allNodes.forEach((node: Element) => {
+                const nodeId = findNodeIdFromSvgId(node.id, graphData.nodes);
+                if (nodeId && nodesToHighlight.has(nodeId)) {
+                    (node as SVGElement).style.opacity = '1';
+                    if (matchedNodeIds.has(nodeId)) {
+                        node.classList.add('node-search-match');
+                    }
                 }
-            }
-        });
+            });
 
-        graphData.edges.forEach(edge => {
-            if (nodesToHighlight.has(edge.source) && nodesToHighlight.has(edge.target)) {
-                const selector = `.LS-${edge.source}.LE-${edge.target}`;
-                svg.querySelectorAll(selector).forEach(el => {
-                    (el as SVGElement).style.opacity = '1';
-                });
-            }
-        });
-    } else if (selectedNode) {
-        // Dim all first
-        setOpacity(allNodes, '0.1');
-        setOpacity(allEdges, '0.05');
+            graphData.edges.forEach(edge => {
+                if (nodesToHighlight.has(edge.source) && nodesToHighlight.has(edge.target)) {
+                    const selector = `.LS-${edge.source}.LE-${edge.target}`;
+                    svg.querySelectorAll(selector).forEach(el => {
+                        (el as SVGElement).style.opacity = '1';
+                    });
+                }
+            });
+        }
+    }
+
+    // Apply selection highlighting (can be layered on top of search)
+    if (selectedNode) {
+        // If search is not active, we need to dim everything first.
+        if (!searchTerm) {
+            setOpacity(allNodes, '0.1');
+            setOpacity(allEdges, '0.05');
+        }
 
         applyClassToNode(selectedNode, 'node-selected');
 
