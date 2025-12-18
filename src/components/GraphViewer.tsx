@@ -73,58 +73,6 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
     };
   }, [code]);
 
-  // Handle Node Clicks
-  useEffect(() => {
-      if (!containerRef.current || !svgContent) return;
-
-      const svgElement = containerRef.current.querySelector('svg');
-      if (!svgElement) return;
-
-      const nodes = svgElement.querySelectorAll('.node');
-
-      const handleNodeClick = (e: Event) => {
-          e.stopPropagation();
-          e.preventDefault();
-
-          const nodeGroup = (e.currentTarget as Element);
-          const fullId = nodeGroup.id;
-
-          let foundId = null;
-          // Sort by length descending to match longest possible ID first
-          const sortedNodeIds = Array.from(graphData.nodes.keys()).sort((a, b) => b.length - a.length);
-
-          for (const id of sortedNodeIds) {
-              if (fullId === id ||
-                  fullId.includes(`-${id}-`) ||
-                  fullId.endsWith(`-${id}`) ||
-                  fullId.startsWith(`${id}-`)) {
-                  foundId = id;
-                  break;
-              }
-          }
-
-          if (foundId) {
-              setSelectedNode(prev => prev === foundId ? null : foundId);
-          }
-      };
-
-      nodes.forEach(n => {
-          (n as SVGElement).style.cursor = 'pointer';
-          n.addEventListener('click', handleNodeClick);
-      });
-
-      const handleBgClick = () => {
-          setSelectedNode(null);
-      };
-
-      svgElement.addEventListener('click', handleBgClick);
-
-      return () => {
-          nodes.forEach(n => n.removeEventListener('click', handleNodeClick));
-          svgElement.removeEventListener('click', handleBgClick);
-      };
-  }, [svgContent, graphData]);
-
   // Apply Styles based on Selection
   useEffect(() => {
       if (!containerRef.current) return;
@@ -203,6 +151,40 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       isDragging.current = false;
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+      const target = e.target as Element;
+
+      // Ignore clicks on controls (buttons)
+      if (target.closest('button')) return;
+
+      const nodeGroup = target.closest('.node');
+
+      if (nodeGroup) {
+          const fullId = nodeGroup.id;
+          let foundId = null;
+          // Sort by length descending to match longest possible ID first
+          const sortedNodeIds = Array.from(graphData.nodes.keys()).sort((a, b) => b.length - a.length);
+
+          for (const id of sortedNodeIds) {
+              if (fullId === id ||
+                  fullId.includes(`-${id}-`) ||
+                  fullId.endsWith(`-${id}`) ||
+                  fullId.startsWith(`${id}-`)) {
+                  foundId = id;
+                  break;
+              }
+          }
+
+          if (foundId) {
+              setSelectedNode(prev => prev === foundId ? null : foundId);
+              return;
+          }
+      }
+
+      // Background click
+      setSelectedNode(null);
+  };
+
   return (
     <div className="relative w-full h-full bg-slate-950 overflow-hidden select-none"
          onWheel={handleWheel}
@@ -210,6 +192,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
          onMouseMove={handleMouseMove}
          onMouseUp={handleMouseUp}
          onMouseLeave={handleMouseUp}
+         onClick={handleClick}
     >
         {/* Controls */}
         <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
@@ -234,7 +217,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
         />
 
         <style>{`
-            .node { transition: opacity 0.3s; }
+            .node { transition: opacity 0.3s; cursor: pointer; }
 
             /* Importance: selected > dependency/dependent > normal */
 
