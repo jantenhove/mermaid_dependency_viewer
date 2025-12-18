@@ -136,7 +136,8 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code, searchTerm }) =>
         const matchedNodeIds = new Set<string>();
 
         graphData.nodes.forEach((node, id) => {
-            if (id.toLowerCase().includes(lowerCaseSearchTerm) || node.label.toLowerCase().includes(lowerCaseSearchTerm)) {
+            const labelMatch = node.label && node.label.toLowerCase().includes(lowerCaseSearchTerm);
+            if (id.toLowerCase().includes(lowerCaseSearchTerm) || labelMatch) {
                 matchedNodeIds.add(id);
             }
         });
