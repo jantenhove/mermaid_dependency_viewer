@@ -15,9 +15,10 @@ mermaid.initialize({
 
 interface GraphViewerProps {
   code: string;
+  searchTerm: string;
 }
 
-export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
+export const GraphViewer: React.FC<GraphViewerProps> = ({ code, searchTerm }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -76,107 +77,141 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
     };
   }, [code]);
 
-  // Apply Styles based on Selection
+  // When searching, clear selection
   useEffect(() => {
-      if (!containerRef.current) return;
-      const svg = containerRef.current.querySelector('svg');
-      if (!svg) return;
+    if (searchTerm) {
+      setSelectedNode(null);
+    }
+  }, [searchTerm]);
 
-      const allNodes = svg.querySelectorAll('.node');
-      const allEdges = svg.querySelectorAll('.edgePaths .edgePath, .edgePaths path, .edgeLabels');
+  // Apply Styles based on Selection OR Search
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const svg = containerRef.current.querySelector('svg');
+    if (!svg) return;
 
-      const setOpacity = (els: NodeListOf<Element>, op: string) => {
-          els.forEach((el: Element) => {
-              (el as SVGElement).style.opacity = op;
-              (el as SVGElement).style.transition = 'opacity 0.3s ease';
-          });
-      };
+    const allNodes = svg.querySelectorAll('.node');
+    const allEdges = svg.querySelectorAll('.edgePaths .edgePath, .edgePaths path, .edgeLabels');
 
-      const colorNode = (id: string, colorClass: string) => {
-           allNodes.forEach((node: Element) => {
-              if (node.id === id ||
-                  node.id.includes(`-${id}-`) ||
-                  node.id.endsWith(`-${id}`) ||
-                  node.id.startsWith(`${id}-`)) {
-                  node.classList.add(colorClass);
-                  node.classList.remove('node-dimmed');
-                  (node as SVGElement).style.opacity = '1';
-              }
-           });
-      };
+    const setOpacity = (els: NodeListOf<Element>, op: string) => {
+        els.forEach((el: Element) => {
+            (el as SVGElement).style.opacity = op;
+            (el as SVGElement).style.transition = 'opacity 0.3s ease';
+        });
+    };
 
-      // Reset all
-      allNodes.forEach(n => {
-          n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependency-sub', 'node-dependent', 'node-dependent-sub');
-      });
-      allEdges.forEach(e => {
-          e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependency-sub', 'edge-dependent', 'edge-dependent-sub');
-      });
+    const findNodeIdFromSvgId = (svgId: string, nodes: Map<string, any>): string | null => {
+        const sortedNodeIds = Array.from(nodes.keys()).sort((a, b) => b.length - a.length);
+        for (const id of sortedNodeIds) {
+            if (svgId === id || svgId.includes(`-${id}-`) || svgId.endsWith(`-${id}`) || svgId.startsWith(`${id}-`)) {
+                return id;
+            }
+        }
+        return null;
+    };
 
-      if (!selectedNode) {
-          setOpacity(allNodes, '1');
-          setOpacity(allEdges, '1');
-          return;
-      }
+    const applyClassToNode = (nodeId: string, className: string) => {
+        allNodes.forEach((nodeEl: Element) => {
+            const foundId = findNodeIdFromSvgId(nodeEl.id, graphData.nodes);
+            if (foundId === nodeId) {
+                nodeEl.classList.add(className);
+                (nodeEl as SVGElement).style.opacity = '1';
+            }
+        });
+    };
 
-      // Dim all first
-      setOpacity(allNodes, '0.1');
-      setOpacity(allEdges, '0.05');
+    // Reset all styles first
+    allNodes.forEach(n => {
+        n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependency-sub', 'node-dependent', 'node-dependent-sub', 'node-search-match');
+    });
+    allEdges.forEach(e => {
+        e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependency-sub', 'edge-dependent', 'edge-dependent-sub');
+    });
+    setOpacity(allNodes, '1');
+    setOpacity(allEdges, '1');
 
-      // Highlight selected
-      colorNode(selectedNode, 'node-selected');
+    // Search logic takes precedence
+    if (searchTerm) {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const matchedNodeIds = new Set<string>();
 
-      const { dependencies, dependents } = findConnections(selectedNode, graphData.adjacency);
+        graphData.nodes.forEach((node, id) => {
+            if (id.toLowerCase().includes(lowerCaseSearchTerm) || node.label.toLowerCase().includes(lowerCaseSearchTerm)) {
+                matchedNodeIds.add(id);
+            }
+        });
 
-      // Differentiate Direct vs Sub Dependencies
-      const directDependencies = graphData.adjacency.get(selectedNode)?.outgoing || [];
-      const subDependencies = dependencies.filter(id => !directDependencies.includes(id) && id !== selectedNode);
+        // Dim everything first
+        setOpacity(allNodes, '0.1');
+        setOpacity(allEdges, '0.05');
 
-      directDependencies.forEach(id => colorNode(id, 'node-dependency'));
-      subDependencies.forEach(id => colorNode(id, 'node-dependency-sub'));
+        if (matchedNodeIds.size === 0) return; // Nothing to highlight
 
-      // Differentiate Direct vs Sub Dependents
-      const directDependents = graphData.adjacency.get(selectedNode)?.incoming || [];
-      const subDependents = dependents.filter(id => !directDependents.includes(id) && id !== selectedNode);
+        const nodesToHighlight = new Set<string>(matchedNodeIds);
+        matchedNodeIds.forEach(id => {
+            const connections = graphData.adjacency.get(id);
+            connections?.incoming.forEach(inc => nodesToHighlight.add(inc));
+            connections?.outgoing.forEach(out => nodesToHighlight.add(out));
+        });
 
-      directDependents.forEach(id => colorNode(id, 'node-dependent'));
-      subDependents.forEach(id => colorNode(id, 'node-dependent-sub'));
+        allNodes.forEach((node: Element) => {
+            const nodeId = findNodeIdFromSvgId(node.id, graphData.nodes);
+            if (nodeId && nodesToHighlight.has(nodeId)) {
+                (node as SVGElement).style.opacity = '1';
+                if (matchedNodeIds.has(nodeId)) {
+                    node.classList.add('node-search-match');
+                }
+            }
+        });
 
-      // Highlight Edges
-      const highlightedIds = new Set([selectedNode, ...dependencies, ...dependents]);
-      graphData.edges.forEach(edge => {
-          if (highlightedIds.has(edge.source) && highlightedIds.has(edge.target)) {
-              // Construct selector using LS and LE classes
-              const selector = `.LS-${edge.source}.LE-${edge.target}`;
-              const els = svg.querySelectorAll(selector);
+        graphData.edges.forEach(edge => {
+            if (nodesToHighlight.has(edge.source) && nodesToHighlight.has(edge.target)) {
+                const selector = `.LS-${edge.source}.LE-${edge.target}`;
+                svg.querySelectorAll(selector).forEach(el => {
+                    (el as SVGElement).style.opacity = '1';
+                });
+            }
+        });
+    } else if (selectedNode) {
+        // Dim all first
+        setOpacity(allNodes, '0.1');
+        setOpacity(allEdges, '0.05');
 
-              let className = '';
+        applyClassToNode(selectedNode, 'node-selected');
 
-              // Dependency Logic (Orange)
-              if (edge.source === selectedNode) {
-                  className = 'edge-dependency'; // Direct outgoing
-              } else if (dependencies.includes(edge.source) && dependencies.includes(edge.target)) {
-                  className = 'edge-dependency-sub'; // Between dependencies
-              }
+        const { dependencies, dependents } = findConnections(selectedNode, graphData.adjacency);
 
-              // Dependent Logic (Green)
-              else if (edge.target === selectedNode) {
-                  className = 'edge-dependent'; // Direct incoming
-              } else if (dependents.includes(edge.source) && dependents.includes(edge.target)) {
-                  className = 'edge-dependent-sub'; // Between dependents
-              }
+        const directDependencies = graphData.adjacency.get(selectedNode)?.outgoing || [];
+        const subDependencies = dependencies.filter(id => !directDependencies.includes(id) && id !== selectedNode);
+        directDependencies.forEach(id => applyClassToNode(id, 'node-dependency'));
+        subDependencies.forEach(id => applyClassToNode(id, 'node-dependency-sub'));
 
-              if (className) {
-                  els.forEach(el => {
-                      el.classList.add(className);
-                      el.classList.remove('edge-dimmed');
-                      (el as SVGElement).style.opacity = '1';
-                  });
-              }
-          }
-      });
+        const directDependents = graphData.adjacency.get(selectedNode)?.incoming || [];
+        const subDependents = dependents.filter(id => !directDependents.includes(id) && id !== selectedNode);
+        directDependents.forEach(id => applyClassToNode(id, 'node-dependent'));
+        subDependents.forEach(id => applyClassToNode(id, 'node-dependent-sub'));
 
-  }, [selectedNode, graphData, svgContent]);
+        const highlightedIds = new Set([selectedNode, ...dependencies, ...dependents]);
+        graphData.edges.forEach(edge => {
+            if (highlightedIds.has(edge.source) && highlightedIds.has(edge.target)) {
+                const selector = `.LS-${edge.source}.LE-${edge.target}`;
+                const els = svg.querySelectorAll(selector);
+                let className = '';
+                if (edge.source === selectedNode) className = 'edge-dependency';
+                else if (dependencies.includes(edge.source) && dependencies.includes(edge.target)) className = 'edge-dependency-sub';
+                else if (edge.target === selectedNode) className = 'edge-dependent';
+                else if (dependents.includes(edge.source) && dependents.includes(edge.target)) className = 'edge-dependent-sub';
+
+                if (className) {
+                    els.forEach(el => {
+                        el.classList.add(className);
+                        (el as SVGElement).style.opacity = '1';
+                    });
+                }
+            }
+        });
+    }
+  }, [selectedNode, graphData, svgContent, searchTerm]);
 
   // Pan & Zoom handlers
   const handleWheel = (e: React.WheelEvent) => {
@@ -285,6 +320,14 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
                 filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));
                 opacity: 1 !important;
             }
+
+            /* Search Match */
+            .node-search-match rect, .node-search-match circle, .node-search-match polygon, .node-search-match path {
+                stroke: #38bdf8 !important; /* light-blue-400 */
+                stroke-width: 4px !important;
+                opacity: 1 !important;
+            }
+            .node-search-match .nodeLabel { fill: #38bdf8 !important; font-weight: bold; }
 
             /* Direct Dependency (Darker Orange) */
             .node-dependency rect, .node-dependency circle, .node-dependency polygon, .node-dependency path {
