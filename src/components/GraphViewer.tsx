@@ -8,6 +8,9 @@ mermaid.initialize({
   theme: 'dark',
   securityLevel: 'loose',
   fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+  flowchart: {
+      padding: 20
+  }
 });
 
 interface GraphViewerProps {
@@ -106,7 +109,9 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       allNodes.forEach(n => {
           n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependent');
       });
-      allEdges.forEach(e => e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependent'));
+      allEdges.forEach(e => {
+          e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependent');
+      });
 
       if (!selectedNode) {
           setOpacity(allNodes, '1');
@@ -125,6 +130,32 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
       dependencies.forEach(id => colorNode(id, 'node-dependency'));
       dependents.forEach(id => colorNode(id, 'node-dependent'));
+
+      // Highlight Edges
+      const highlightedIds = new Set([selectedNode, ...dependencies, ...dependents]);
+      graphData.edges.forEach(edge => {
+          if (highlightedIds.has(edge.source) && highlightedIds.has(edge.target)) {
+              // Construct selector using LS and LE classes
+              const selector = `.LS-${edge.source}.LE-${edge.target}`;
+              const els = svg.querySelectorAll(selector);
+
+              let className = '';
+              // Determine color:
+              // If target is in dependencies (upstream/downstream chain depending on semantics, but assuming flow A->B)
+              // If A is selected, B is dependency. Edge A->B points to dependency.
+              if (dependencies.includes(edge.target)) {
+                  className = 'edge-dependency';
+              } else if (dependents.includes(edge.source)) {
+                  className = 'edge-dependent';
+              }
+
+              els.forEach(el => {
+                  if (className) el.classList.add(className);
+                  el.classList.remove('edge-dimmed');
+                  (el as SVGElement).style.opacity = '1';
+              });
+          }
+      });
 
   }, [selectedNode, graphData, svgContent]);
 
@@ -247,6 +278,23 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .node-dependent .nodeLabel { fill: #10b981 !important; font-weight: bold; }
 
             .node-dimmed { opacity: 0.1; }
+
+            /* Edges */
+            .edgePath path { transition: opacity 0.3s, stroke 0.3s, stroke-width 0.3s; }
+
+            .edge-dependency {
+                stroke: #f97316 !important;
+                stroke-width: 2px !important;
+                opacity: 1 !important;
+            }
+
+            .edge-dependent {
+                stroke: #10b981 !important;
+                stroke-width: 2px !important;
+                opacity: 1 !important;
+            }
+
+            .edge-dimmed { opacity: 0.05; }
         `}</style>
     </div>
   );
