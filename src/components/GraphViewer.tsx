@@ -107,10 +107,10 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
       // Reset all
       allNodes.forEach(n => {
-          n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependency-sub', 'node-dependent');
+          n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependency-sub', 'node-dependent', 'node-dependent-sub');
       });
       allEdges.forEach(e => {
-          e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependency-sub', 'edge-dependent');
+          e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependency-sub', 'edge-dependent', 'edge-dependent-sub');
       });
 
       if (!selectedNode) {
@@ -135,8 +135,12 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       directDependencies.forEach(id => colorNode(id, 'node-dependency'));
       subDependencies.forEach(id => colorNode(id, 'node-dependency-sub'));
 
-      // Dependents (keep unified for now as not requested to change)
-      dependents.forEach(id => colorNode(id, 'node-dependent'));
+      // Differentiate Direct vs Sub Dependents
+      const directDependents = graphData.adjacency.get(selectedNode)?.incoming || [];
+      const subDependents = dependents.filter(id => !directDependents.includes(id) && id !== selectedNode);
+
+      directDependents.forEach(id => colorNode(id, 'node-dependent'));
+      subDependents.forEach(id => colorNode(id, 'node-dependent-sub'));
 
       // Highlight Edges
       const highlightedIds = new Set([selectedNode, ...dependencies, ...dependents]);
@@ -148,21 +152,18 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
               let className = '';
 
-              // Dependency Logic
+              // Dependency Logic (Orange)
               if (edge.source === selectedNode) {
-                  // Direct dependency edge
-                  className = 'edge-dependency';
+                  className = 'edge-dependency'; // Direct outgoing
               } else if (dependencies.includes(edge.source) && dependencies.includes(edge.target)) {
-                  // Edge between dependencies (Sub)
-                  className = 'edge-dependency-sub';
+                  className = 'edge-dependency-sub'; // Between dependencies
               }
-              // Dependent Logic
+
+              // Dependent Logic (Green)
               else if (edge.target === selectedNode) {
-                  // Direct dependent edge
-                  className = 'edge-dependent';
+                  className = 'edge-dependent'; // Direct incoming
               } else if (dependents.includes(edge.source) && dependents.includes(edge.target)) {
-                  // Edge between dependents
-                  className = 'edge-dependent';
+                  className = 'edge-dependent-sub'; // Between dependents
               }
 
               if (className) {
@@ -272,14 +273,12 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .node { transition: opacity 0.3s; cursor: pointer; }
             .node rect, .node circle, .node polygon, .node path { pointer-events: all; }
 
-            /* Add padding to labels to prevent text cutoff by border */
             span.nodeLabel {
                 padding: 0 10px !important;
                 display: inline-block;
             }
 
-            /* Importance: selected > dependency/dependent > normal */
-
+            /* Selected */
             .node-selected rect, .node-selected circle, .node-selected polygon, .node-selected path {
                 stroke: #fff !important;
                 stroke-width: 4px !important;
@@ -287,14 +286,15 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
                 opacity: 1 !important;
             }
 
+            /* Direct Dependency (Darker Orange) */
             .node-dependency rect, .node-dependency circle, .node-dependency polygon, .node-dependency path {
-                stroke: #f97316 !important; /* orange-500 */
+                stroke: #ea580c !important; /* orange-600 */
                 stroke-width: 3px !important;
                 opacity: 1 !important;
             }
-            .node-dependency .nodeLabel { fill: #f97316 !important; font-weight: bold; }
+            .node-dependency .nodeLabel { fill: #ea580c !important; font-weight: bold; }
 
-            /* Sub-dependency (Transitive) - Orange-Greyish/Lighter */
+            /* Sub Dependency (Lighter Orange) */
             .node-dependency-sub rect, .node-dependency-sub circle, .node-dependency-sub polygon, .node-dependency-sub path {
                 stroke: #fdba74 !important; /* orange-300 */
                 stroke-width: 3px !important;
@@ -302,12 +302,21 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             }
             .node-dependency-sub .nodeLabel { fill: #fdba74 !important; font-weight: bold; }
 
+            /* Direct Dependent (Darker Green) */
             .node-dependent rect, .node-dependent circle, .node-dependent polygon, .node-dependent path {
-                stroke: #10b981 !important; /* emerald-500 */
+                stroke: #059669 !important; /* emerald-600 */
                 stroke-width: 3px !important;
                 opacity: 1 !important;
             }
-            .node-dependent .nodeLabel { fill: #10b981 !important; font-weight: bold; }
+            .node-dependent .nodeLabel { fill: #059669 !important; font-weight: bold; }
+
+            /* Sub Dependent (Lighter Green) */
+            .node-dependent-sub rect, .node-dependent-sub circle, .node-dependent-sub polygon, .node-dependent-sub path {
+                stroke: #6ee7b7 !important; /* emerald-300 */
+                stroke-width: 3px !important;
+                opacity: 1 !important;
+            }
+            .node-dependent-sub .nodeLabel { fill: #6ee7b7 !important; font-weight: bold; }
 
             .node-dimmed { opacity: 0.1; }
 
@@ -315,19 +324,25 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .edgePath path { transition: opacity 0.3s, stroke 0.3s, stroke-width 0.3s; }
 
             .edge-dependency {
-                stroke: #f97316 !important;
+                stroke: #ea580c !important;
                 stroke-width: 2px !important;
                 opacity: 1 !important;
             }
 
             .edge-dependency-sub {
-                stroke: #fdba74 !important; /* orange-300 */
+                stroke: #fdba74 !important;
                 stroke-width: 2px !important;
                 opacity: 1 !important;
             }
 
             .edge-dependent {
-                stroke: #10b981 !important;
+                stroke: #059669 !important;
+                stroke-width: 2px !important;
+                opacity: 1 !important;
+            }
+
+            .edge-dependent-sub {
+                stroke: #6ee7b7 !important;
                 stroke-width: 2px !important;
                 opacity: 1 !important;
             }
