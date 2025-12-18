@@ -221,6 +221,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
         <style>{`
             .node { transition: opacity 0.3s; cursor: pointer; }
+            .node rect, .node circle, .node polygon, .node path { pointer-events: all; }
 
             /* Importance: selected > dependency/dependent > normal */
 
