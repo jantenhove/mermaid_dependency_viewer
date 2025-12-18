@@ -97,12 +97,15 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
                   node.id.startsWith(`${id}-`)) {
                   node.classList.add(colorClass);
                   node.classList.remove('node-dimmed');
+                  (node as SVGElement).style.opacity = '1';
               }
            });
       };
 
       // Reset all
-      allNodes.forEach(n => n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependent'));
+      allNodes.forEach(n => {
+          n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependent');
+      });
       allEdges.forEach(e => e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependent'));
 
       if (!selectedNode) {
