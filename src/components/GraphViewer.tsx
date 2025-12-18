@@ -254,6 +254,12 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .node { transition: opacity 0.3s; cursor: pointer; }
             .node rect, .node circle, .node polygon, .node path { pointer-events: all; }
 
+            /* Add padding to labels to prevent text cutoff by border */
+            span.nodeLabel {
+                padding: 0 10px !important;
+                display: inline-block;
+            }
+
             /* Importance: selected > dependency/dependent > normal */
 
             .node-selected rect, .node-selected circle, .node-selected polygon, .node-selected path {
