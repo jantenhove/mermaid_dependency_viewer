@@ -239,7 +239,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-950 overflow-hidden select-none"
+    <div className="absolute inset-0 bg-slate-950 overflow-hidden select-none"
          onWheel={handleWheel}
          onMouseDown={handleMouseDown}
          onMouseMove={handleMouseMove}
