@@ -294,10 +294,11 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             }
             .node-dependency .nodeLabel { fill: #ea580c !important; font-weight: bold; }
 
-            /* Sub Dependency (Lighter Orange) */
+            /* Sub Dependency (Lighter Orange + Dashed) */
             .node-dependency-sub rect, .node-dependency-sub circle, .node-dependency-sub polygon, .node-dependency-sub path {
                 stroke: #fdba74 !important; /* orange-300 */
                 stroke-width: 3px !important;
+                stroke-dasharray: 6 3;
                 opacity: 1 !important;
             }
             .node-dependency-sub .nodeLabel { fill: #fdba74 !important; font-weight: bold; }
@@ -310,10 +311,11 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             }
             .node-dependent .nodeLabel { fill: #059669 !important; font-weight: bold; }
 
-            /* Sub Dependent (Lighter Green) */
+            /* Sub Dependent (Lighter Green + Dashed) */
             .node-dependent-sub rect, .node-dependent-sub circle, .node-dependent-sub polygon, .node-dependent-sub path {
                 stroke: #6ee7b7 !important; /* emerald-300 */
                 stroke-width: 3px !important;
+                stroke-dasharray: 6 3;
                 opacity: 1 !important;
             }
             .node-dependent-sub .nodeLabel { fill: #6ee7b7 !important; font-weight: bold; }
@@ -332,6 +334,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .edge-dependency-sub {
                 stroke: #fdba74 !important;
                 stroke-width: 2px !important;
+                stroke-dasharray: 6 3;
                 opacity: 1 !important;
             }
 
@@ -344,6 +347,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
             .edge-dependent-sub {
                 stroke: #6ee7b7 !important;
                 stroke-width: 2px !important;
+                stroke-dasharray: 6 3;
                 opacity: 1 !important;
             }
 
