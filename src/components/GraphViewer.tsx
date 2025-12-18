@@ -42,7 +42,19 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
         const { svg } = await mermaid.render(id, code);
 
         if (isMounted) {
-          setSvgContent(svg);
+          // Clean up the SVG output to remove height/width attributes that mess with scaling
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svg, "image/svg+xml");
+          const svgEl = doc.querySelector('svg');
+          if (svgEl) {
+            svgEl.removeAttribute('height');
+            svgEl.removeAttribute('width');
+            svgEl.style.width = '100%';
+            svgEl.style.height = '100%';
+            setSvgContent(svgEl.outerHTML);
+          } else {
+             setSvgContent(svg);
+          }
           setError(null);
         }
       } catch (err) {
@@ -53,6 +65,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       }
     };
 
+    // Debounce render
     const timeout = setTimeout(renderGraph, 500);
     return () => {
         isMounted = false;
@@ -60,31 +73,31 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
     };
   }, [code]);
 
-  // Handle Node Clicks & Highlighting
+  // Handle Node Clicks
   useEffect(() => {
       if (!containerRef.current || !svgContent) return;
 
-      const svgElement = containerRef.current.querySelector('svg') as SVGElement;
+      const svgElement = containerRef.current.querySelector('svg');
       if (!svgElement) return;
-
-      svgElement.style.width = '100%';
-      svgElement.style.height = '100%';
-      svgElement.style.overflow = 'visible';
 
       const nodes = svgElement.querySelectorAll('.node');
 
       const handleNodeClick = (e: Event) => {
           e.stopPropagation();
-          const nodeGroup = (e.target as Element).closest('.node');
-          if (!nodeGroup) return;
+          e.preventDefault();
 
+          const nodeGroup = (e.currentTarget as Element);
           const fullId = nodeGroup.id;
 
           let foundId = null;
+          // Sort by length descending to match longest possible ID first
           const sortedNodeIds = Array.from(graphData.nodes.keys()).sort((a, b) => b.length - a.length);
 
           for (const id of sortedNodeIds) {
-              if (fullId.includes(`-${id}-`) || fullId.endsWith(`-${id}`)) {
+              if (fullId === id ||
+                  fullId.includes(`-${id}-`) ||
+                  fullId.endsWith(`-${id}`) ||
+                  fullId.startsWith(`${id}-`)) {
                   foundId = id;
                   break;
               }
@@ -92,8 +105,6 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
           if (foundId) {
               setSelectedNode(prev => prev === foundId ? null : foundId);
-          } else {
-              console.warn("Could not match SVG node to Graph ID:", fullId);
           }
       };
 
@@ -102,12 +113,15 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
           n.addEventListener('click', handleNodeClick);
       });
 
-      const handleBgClick = () => setSelectedNode(null);
-      containerRef.current.addEventListener('click', handleBgClick);
+      const handleBgClick = () => {
+          setSelectedNode(null);
+      };
+
+      svgElement.addEventListener('click', handleBgClick);
 
       return () => {
           nodes.forEach(n => n.removeEventListener('click', handleNodeClick));
-          containerRef.current?.removeEventListener('click', handleBgClick);
+          svgElement.removeEventListener('click', handleBgClick);
       };
   }, [svgContent, graphData]);
 
@@ -118,24 +132,28 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       if (!svg) return;
 
       const allNodes = svg.querySelectorAll('.node');
-      const allEdges = svg.querySelectorAll('.edgePaths path, .edgeLabels');
+      const allEdges = svg.querySelectorAll('.edgePaths .edgePath, .edgePaths path, .edgeLabels');
 
       const setOpacity = (els: NodeListOf<Element>, op: string) => {
           els.forEach((el: Element) => {
               (el as SVGElement).style.opacity = op;
-              (el as SVGElement).style.transition = 'opacity 0.3s ease, filter 0.3s ease';
+              (el as SVGElement).style.transition = 'opacity 0.3s ease';
           });
       };
 
       const colorNode = (id: string, colorClass: string) => {
            allNodes.forEach((node: Element) => {
-              if (node.id.includes(`-${id}-`) || node.id.endsWith(`-${id}`)) {
+              if (node.id === id ||
+                  node.id.includes(`-${id}-`) ||
+                  node.id.endsWith(`-${id}`) ||
+                  node.id.startsWith(`${id}-`)) {
                   node.classList.add(colorClass);
                   node.classList.remove('node-dimmed');
               }
            });
       };
 
+      // Reset all
       allNodes.forEach(n => n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependent'));
       allEdges.forEach(e => e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependent'));
 
@@ -145,26 +163,27 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
           return;
       }
 
+      // Dim all first
       setOpacity(allNodes, '0.1');
       setOpacity(allEdges, '0.05');
 
+      // Highlight selected
       colorNode(selectedNode, 'node-selected');
 
       const { dependencies, dependents } = findConnections(selectedNode, graphData.adjacency);
+
       dependencies.forEach(id => colorNode(id, 'node-dependency'));
       dependents.forEach(id => colorNode(id, 'node-dependent'));
 
-  }, [selectedNode, graphData]);
+  }, [selectedNode, graphData, svgContent]);
 
   // Pan & Zoom handlers
   const handleWheel = (e: React.WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          const scale = 1 - e.deltaY * 0.001;
-          setZoom(z => Math.max(0.1, Math.min(5, z * scale)));
-      } else {
-         setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
-      }
+      e.preventDefault();
+      e.stopPropagation();
+
+      const scale = 1 - e.deltaY * 0.001;
+      setZoom(z => Math.max(0.1, Math.min(5, z * scale)));
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -216,6 +235,9 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
         <style>{`
             .node { transition: opacity 0.3s; }
+
+            /* Importance: selected > dependency/dependent > normal */
+
             .node-selected rect, .node-selected circle, .node-selected polygon, .node-selected path {
                 stroke: #fff !important;
                 stroke-width: 4px !important;
