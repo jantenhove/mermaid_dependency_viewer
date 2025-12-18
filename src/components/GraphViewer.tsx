@@ -8,6 +8,9 @@ mermaid.initialize({
   theme: 'dark',
   securityLevel: 'loose',
   fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+  flowchart: {
+      padding: 20
+  }
 });
 
 interface GraphViewerProps {
@@ -73,58 +76,6 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
     };
   }, [code]);
 
-  // Handle Node Clicks
-  useEffect(() => {
-      if (!containerRef.current || !svgContent) return;
-
-      const svgElement = containerRef.current.querySelector('svg');
-      if (!svgElement) return;
-
-      const nodes = svgElement.querySelectorAll('.node');
-
-      const handleNodeClick = (e: Event) => {
-          e.stopPropagation();
-          e.preventDefault();
-
-          const nodeGroup = (e.currentTarget as Element);
-          const fullId = nodeGroup.id;
-
-          let foundId = null;
-          // Sort by length descending to match longest possible ID first
-          const sortedNodeIds = Array.from(graphData.nodes.keys()).sort((a, b) => b.length - a.length);
-
-          for (const id of sortedNodeIds) {
-              if (fullId === id ||
-                  fullId.includes(`-${id}-`) ||
-                  fullId.endsWith(`-${id}`) ||
-                  fullId.startsWith(`${id}-`)) {
-                  foundId = id;
-                  break;
-              }
-          }
-
-          if (foundId) {
-              setSelectedNode(prev => prev === foundId ? null : foundId);
-          }
-      };
-
-      nodes.forEach(n => {
-          (n as SVGElement).style.cursor = 'pointer';
-          n.addEventListener('click', handleNodeClick);
-      });
-
-      const handleBgClick = () => {
-          setSelectedNode(null);
-      };
-
-      svgElement.addEventListener('click', handleBgClick);
-
-      return () => {
-          nodes.forEach(n => n.removeEventListener('click', handleNodeClick));
-          svgElement.removeEventListener('click', handleBgClick);
-      };
-  }, [svgContent, graphData]);
-
   // Apply Styles based on Selection
   useEffect(() => {
       if (!containerRef.current) return;
@@ -149,13 +100,18 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
                   node.id.startsWith(`${id}-`)) {
                   node.classList.add(colorClass);
                   node.classList.remove('node-dimmed');
+                  (node as SVGElement).style.opacity = '1';
               }
            });
       };
 
       // Reset all
-      allNodes.forEach(n => n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependent'));
-      allEdges.forEach(e => e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependent'));
+      allNodes.forEach(n => {
+          n.classList.remove('node-dimmed', 'node-selected', 'node-dependency', 'node-dependency-sub', 'node-dependent', 'node-dependent-sub');
+      });
+      allEdges.forEach(e => {
+          e.classList.remove('edge-dimmed', 'edge-dependency', 'edge-dependency-sub', 'edge-dependent', 'edge-dependent-sub');
+      });
 
       if (!selectedNode) {
           setOpacity(allNodes, '1');
@@ -172,8 +128,53 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
 
       const { dependencies, dependents } = findConnections(selectedNode, graphData.adjacency);
 
-      dependencies.forEach(id => colorNode(id, 'node-dependency'));
-      dependents.forEach(id => colorNode(id, 'node-dependent'));
+      // Differentiate Direct vs Sub Dependencies
+      const directDependencies = graphData.adjacency.get(selectedNode)?.outgoing || [];
+      const subDependencies = dependencies.filter(id => !directDependencies.includes(id) && id !== selectedNode);
+
+      directDependencies.forEach(id => colorNode(id, 'node-dependency'));
+      subDependencies.forEach(id => colorNode(id, 'node-dependency-sub'));
+
+      // Differentiate Direct vs Sub Dependents
+      const directDependents = graphData.adjacency.get(selectedNode)?.incoming || [];
+      const subDependents = dependents.filter(id => !directDependents.includes(id) && id !== selectedNode);
+
+      directDependents.forEach(id => colorNode(id, 'node-dependent'));
+      subDependents.forEach(id => colorNode(id, 'node-dependent-sub'));
+
+      // Highlight Edges
+      const highlightedIds = new Set([selectedNode, ...dependencies, ...dependents]);
+      graphData.edges.forEach(edge => {
+          if (highlightedIds.has(edge.source) && highlightedIds.has(edge.target)) {
+              // Construct selector using LS and LE classes
+              const selector = `.LS-${edge.source}.LE-${edge.target}`;
+              const els = svg.querySelectorAll(selector);
+
+              let className = '';
+
+              // Dependency Logic (Orange)
+              if (edge.source === selectedNode) {
+                  className = 'edge-dependency'; // Direct outgoing
+              } else if (dependencies.includes(edge.source) && dependencies.includes(edge.target)) {
+                  className = 'edge-dependency-sub'; // Between dependencies
+              }
+
+              // Dependent Logic (Green)
+              else if (edge.target === selectedNode) {
+                  className = 'edge-dependent'; // Direct incoming
+              } else if (dependents.includes(edge.source) && dependents.includes(edge.target)) {
+                  className = 'edge-dependent-sub'; // Between dependents
+              }
+
+              if (className) {
+                  els.forEach(el => {
+                      el.classList.add(className);
+                      el.classList.remove('edge-dimmed');
+                      (el as SVGElement).style.opacity = '1';
+                  });
+              }
+          }
+      });
 
   }, [selectedNode, graphData, svgContent]);
 
@@ -203,6 +204,40 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
       isDragging.current = false;
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+      const target = e.target as Element;
+
+      // Ignore clicks on controls (buttons)
+      if (target.closest('button')) return;
+
+      const nodeGroup = target.closest('.node');
+
+      if (nodeGroup) {
+          const fullId = nodeGroup.id;
+          let foundId = null;
+          // Sort by length descending to match longest possible ID first
+          const sortedNodeIds = Array.from(graphData.nodes.keys()).sort((a, b) => b.length - a.length);
+
+          for (const id of sortedNodeIds) {
+              if (fullId === id ||
+                  fullId.includes(`-${id}-`) ||
+                  fullId.endsWith(`-${id}`) ||
+                  fullId.startsWith(`${id}-`)) {
+                  foundId = id;
+                  break;
+              }
+          }
+
+          if (foundId) {
+              setSelectedNode(prev => prev === foundId ? null : foundId);
+              return;
+          }
+      }
+
+      // Background click
+      setSelectedNode(null);
+  };
+
   return (
     <div className="relative w-full h-full bg-slate-950 overflow-hidden select-none"
          onWheel={handleWheel}
@@ -210,6 +245,7 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
          onMouseMove={handleMouseMove}
          onMouseUp={handleMouseUp}
          onMouseLeave={handleMouseUp}
+         onClick={handleClick}
     >
         {/* Controls */}
         <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
@@ -234,10 +270,15 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
         />
 
         <style>{`
-            .node { transition: opacity 0.3s; }
+            .node { transition: opacity 0.3s; cursor: pointer; }
+            .node rect, .node circle, .node polygon, .node path { pointer-events: all; }
 
-            /* Importance: selected > dependency/dependent > normal */
+            span.nodeLabel {
+                padding: 0 10px !important;
+                display: inline-block;
+            }
 
+            /* Selected */
             .node-selected rect, .node-selected circle, .node-selected polygon, .node-selected path {
                 stroke: #fff !important;
                 stroke-width: 4px !important;
@@ -245,21 +286,72 @@ export const GraphViewer: React.FC<GraphViewerProps> = ({ code }) => {
                 opacity: 1 !important;
             }
 
+            /* Direct Dependency (Darker Orange) */
             .node-dependency rect, .node-dependency circle, .node-dependency polygon, .node-dependency path {
-                stroke: #f97316 !important; /* orange-500 */
+                stroke: #ea580c !important; /* orange-600 */
                 stroke-width: 3px !important;
                 opacity: 1 !important;
             }
-            .node-dependency .nodeLabel { fill: #f97316 !important; font-weight: bold; }
+            .node-dependency .nodeLabel { fill: #ea580c !important; font-weight: bold; }
 
+            /* Sub Dependency (Lighter Orange + Dashed) */
+            .node-dependency-sub rect, .node-dependency-sub circle, .node-dependency-sub polygon, .node-dependency-sub path {
+                stroke: #fdba74 !important; /* orange-300 */
+                stroke-width: 3px !important;
+                stroke-dasharray: 6 3;
+                opacity: 1 !important;
+            }
+            .node-dependency-sub .nodeLabel { fill: #fdba74 !important; font-weight: bold; }
+
+            /* Direct Dependent (Darker Green) */
             .node-dependent rect, .node-dependent circle, .node-dependent polygon, .node-dependent path {
-                stroke: #10b981 !important; /* emerald-500 */
+                stroke: #059669 !important; /* emerald-600 */
                 stroke-width: 3px !important;
                 opacity: 1 !important;
             }
-            .node-dependent .nodeLabel { fill: #10b981 !important; font-weight: bold; }
+            .node-dependent .nodeLabel { fill: #059669 !important; font-weight: bold; }
+
+            /* Sub Dependent (Lighter Green + Dashed) */
+            .node-dependent-sub rect, .node-dependent-sub circle, .node-dependent-sub polygon, .node-dependent-sub path {
+                stroke: #6ee7b7 !important; /* emerald-300 */
+                stroke-width: 3px !important;
+                stroke-dasharray: 6 3;
+                opacity: 1 !important;
+            }
+            .node-dependent-sub .nodeLabel { fill: #6ee7b7 !important; font-weight: bold; }
 
             .node-dimmed { opacity: 0.1; }
+
+            /* Edges */
+            .edgePath path { transition: opacity 0.3s, stroke 0.3s, stroke-width 0.3s; }
+
+            .edge-dependency {
+                stroke: #ea580c !important;
+                stroke-width: 2px !important;
+                opacity: 1 !important;
+            }
+
+            .edge-dependency-sub {
+                stroke: #fdba74 !important;
+                stroke-width: 2px !important;
+                stroke-dasharray: 6 3;
+                opacity: 1 !important;
+            }
+
+            .edge-dependent {
+                stroke: #059669 !important;
+                stroke-width: 2px !important;
+                opacity: 1 !important;
+            }
+
+            .edge-dependent-sub {
+                stroke: #6ee7b7 !important;
+                stroke-width: 2px !important;
+                stroke-dasharray: 6 3;
+                opacity: 1 !important;
+            }
+
+            .edge-dimmed { opacity: 0.05; }
         `}</style>
     </div>
   );
