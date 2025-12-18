@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# Interactive Mermaid Graph Visualizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is a static website that allows users to visualize and interact with Mermaid dependency graphs. Users can click on nodes to highlight their transitive dependencies (orange) and dependents (green).
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Interactive Graph**: Click nodes to trace dependencies up and down the stream.
+- **Live Editor**: Paste Mermaid code and see changes instantly.
+- **Validation**: Basic syntax error detection.
+- **Modern UI**: Built with React, Vite, and Tailwind CSS.
 
-## React Compiler
+## Local Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+To run this project locally:
 
-## Expanding the ESLint configuration
+1.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+2.  **Start Development Server**
+    ```bash
+    npm run dev
+    ```
+    Open your browser to the URL shown (usually `http://localhost:5173`).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Testing
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+The core logic for parsing the Mermaid graph and calculating dependencies is located in `src/utils/graphParser.ts`. You can run the unit tests for this parser using the following command:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npx tsx src/utils/testParser.ts
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deployment on Render
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+This project is designed to be deployed as a **Static Site** on [Render](https://render.com/).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1.  **Create a New Static Site**
+    - Go to your Render Dashboard.
+    - Click **New +** -> **Static Site**.
+
+2.  **Connect Repository**
+    - Connect your GitHub/GitLab repository containing this code.
+
+3.  **Configure Build Settings**
+    - **Name**: (Your choice, e.g., `mermaid-interactive`)
+    - **Branch**: `main` (or the branch you are working on)
+    - **Root Directory**: (Leave blank / default)
+    - **Build Command**: `npm install && npm run build`
+    - **Publish Directory**: `dist`
+
+4.  **Deploy**
+    - Click **Create Static Site**.
+    - Render will build the project and deploy it. Once complete, you will be given a URL (e.g., `https://mermaid-interactive.onrender.com`).
