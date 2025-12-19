@@ -6,10 +6,15 @@ import { EXAMPLE_GRAPH } from './constants';
 
 function App() {
   const [input, setInput] = useState(EXAMPLE_GRAPH);
+  const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
-      <Header onLoadExample={() => setInput(EXAMPLE_GRAPH)} />
+      <Header
+        onLoadExample={() => setInput(EXAMPLE_GRAPH)}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
 
       <main className="flex-1 flex flex-col-reverse lg:flex-row overflow-hidden">
         {/* Left Panel: Editor */}
@@ -35,7 +40,7 @@ function App() {
         <div className="w-full lg:w-2/3 bg-slate-950 relative overflow-hidden flex flex-col flex-1">
           {/* Set a min-height for mobile to ensure the graph is visible */}
           <div className="relative flex-1 min-h-[50vh] lg:min-h-0">
-             <GraphViewer code={input} />
+             <GraphViewer code={input} searchTerm={searchTerm} />
           </div>
         </div>
       </main>
